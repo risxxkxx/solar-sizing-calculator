@@ -82,11 +82,67 @@ export function proportionalNightShare(start, end) {
   return (nightHours(start, end) / 24) * 100;
 }
 
-/** v1 orientation correction relative to 34° / south. */
+/**
+ * APPROXIMATE OFFLINE orientation model (used only when PVGIS is unavailable).
+ *
+ * Returns annual yield relative to the table reference (34° tilt, south),
+ * calibrated for ~41–42° N. Anchor values (fraction of optimum) at tilts
+ * 0° / 34° / 90°:
+ *
+ *   south      0.87 / 1.00  / 0.64
+ *   east/west  0.87 / 0.82  / 0.57
+ *   north      0.87 / 0.575 / 0.28
+ *
+ * Each row is a quadratic in tilt through its three anchors. Azimuth is then
+ * blended with f(d) = a + b·cos(d) + c·cos(2d), d = angular distance from
+ * south (0–180°), which hits the south / east-west / north rows exactly.
+ * One annual factor is applied to every month, so the seasonal shape is not
+ * modelled (vertical arrays are relatively better in winter in reality).
+ */
+export const ORIENTATION_ANCHORS = Object.freeze({
+  tilts: [0, 34, 90],
+  south: [0.87, 1.0, 0.64],
+  eastWest: [0.87, 0.82, 0.57],
+  north: [0.87, 0.575, 0.28],
+});
+
+function quadThrough([x0, x1, x2], [y0, y1, y2], x) {
+  // Lagrange interpolation through three points
+  return (
+    (y0 * (x - x1) * (x - x2)) / ((x0 - x1) * (x0 - x2)) +
+    (y1 * (x - x0) * (x - x2)) / ((x1 - x0) * (x1 - x2)) +
+    (y2 * (x - x0) * (x - x1)) / ((x2 - x0) * (x2 - x1))
+  );
+}
+
+/** Angular distance from south (0–180°) for a compass azimuth (0=N, 90=E, 180=S, 270=W). */
+export function azimuthDeviation(azimuth) {
+  const a = ((azimuth % 360) + 360) % 360;
+  return Math.abs(a - 180);
+}
+
 export function orientationFactor(tilt, azimuth) {
-  const tiltFactor = Math.max(0.05, Math.cos((Math.abs(tilt - 34) * Math.PI) / 180));
-  const azFactor = Math.max(0.05, Math.cos(((Math.abs(azimuth - 180) * Math.PI) / 180) * 0.5));
-  return tiltFactor * azFactor;
+  const t = clamp(tilt, 0, 90);
+  const A = ORIENTATION_ANCHORS;
+  const S = quadThrough(A.tilts, A.south, t);
+  const EW = quadThrough(A.tilts, A.eastWest, t);
+  const N = quadThrough(A.tilts, A.north, t);
+  const b = (S - N) / 2;
+  const a = ((S + N) / 2 + EW) / 2;
+  const c = ((S + N) / 2 - EW) / 2;
+  const d = (azimuthDeviation(azimuth) * Math.PI) / 180;
+  return clamp(a + b * Math.cos(d) + c * Math.cos(2 * d), 0.2, 1);
+}
+
+/** Offline monthly yield: bundled table (34°/S) × orientation factor. */
+export function fallbackYield(pvout, tilt, azimuth) {
+  const factor = orientationFactor(tilt, azimuth);
+  return { factor, monthly: pvout.map((v) => v * factor) };
+}
+
+/** True if `m` is 12 finite, non-negative monthly values with a positive sum. */
+export function isValidMonthly(m) {
+  return Array.isArray(m) && m.length === 12 && m.every((v) => Number.isFinite(v) && v >= 0) && m.some((v) => v > 0);
 }
 
 /** Month with the lowest DAILY specific yield (kWh/kWp/day). */
@@ -228,7 +284,10 @@ export function evaluate(input) {
   const series = monthlySeries(kWp, p.monthlyYield, p.dailyConsumption);
   const annualProduction = series.production.reduce((a, b) => a + b, 0);
   const annualConsumption = p.dailyConsumption * 365;
-  const selfSufficiency = annualConsumption > 0 ? (Math.min(annualProduction, annualConsumption) / annualConsumption) * 100 : 100;
+  // "Theoretical annual coverage": ignores the timing mismatch between
+  // production and use (summer surplus cannot cover winter, daytime PV cannot
+  // cover the night without storage). Real self-sufficiency is lower.
+  const theoreticalCoverage = annualConsumption > 0 ? (Math.min(annualProduction, annualConsumption) / annualConsumption) * 100 : 100;
 
   const solarDailyWorst = series.dailyProduction[worst.index];
   const surplusWorst = solarDailyWorst - load.daytime;
@@ -248,7 +307,7 @@ export function evaluate(input) {
   return {
     mode, worst, load, battery, perPanelWorst, sizing,
     system: { panels, kWp, batteryGross, batteryUsable },
-    series, annualProduction, annualConsumption, selfSufficiency,
+    series, annualProduction, annualConsumption, theoreticalCoverage,
     solarDailyWorst, surplusWorst, leftoverSurplus, reserve, refillDays,
     inverter,
     checks, verdict,

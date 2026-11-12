@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   nightHours, worstMonth, ceilSafe, evaluate, loadSplit, batteryRequirement,
   reserveRefillDays, normalizeInputs, proportionalNightShare,
-  roundUpInverter, sizeInverter,
+  roundUpInverter, sizeInverter, orientationFactor, fallbackYield, azimuthDeviation, isValidMonthly,
 } from '../src/calc.js';
 import { findCity } from '../src/data.js';
 
@@ -196,5 +196,71 @@ describe('inverter sizing', () => {
     const v2 = sizeInverter({ peakLoadKw: 5, kWp, dcAcRatio: 1.2 }).size; // 8.85 -> 10 kW
     expect(v1).toBe(15);
     expect(v2).toBe(10);
+  });
+});
+
+describe('offline orientation model (fallback)', () => {
+  it('is 1.0 at the table reference (34°, south)', () => {
+    expect(orientationFactor(34, 180)).toBeCloseTo(1, 6);
+  });
+  it('flat roof ≈ 0.85–0.90 regardless of azimuth', () => {
+    for (const az of [0, 90, 180, 270]) {
+      const f = orientationFactor(0, az);
+      expect(f).toBeGreaterThanOrEqual(0.85);
+      expect(f).toBeLessThanOrEqual(0.9);
+    }
+  });
+  it('vertical south facade ≈ 0.60–0.65', () => {
+    const f = orientationFactor(90, 180);
+    expect(f).toBeGreaterThanOrEqual(0.6);
+    expect(f).toBeLessThanOrEqual(0.65);
+  });
+  it('east and west at 34° ≈ 0.80–0.85 and symmetric', () => {
+    const e = orientationFactor(34, 90);
+    const w = orientationFactor(34, 270);
+    expect(e).toBeCloseTo(w, 9);
+    expect(e).toBeGreaterThanOrEqual(0.8);
+    expect(e).toBeLessThanOrEqual(0.85);
+  });
+  it('north at 34° ≈ 0.55–0.60 (v1 clamped this to 0.05)', () => {
+    const f = orientationFactor(34, 0);
+    expect(f).toBeGreaterThanOrEqual(0.55);
+    expect(f).toBeLessThanOrEqual(0.6);
+  });
+  it('stays within [0.2, 1] over the whole input grid', () => {
+    for (let t = 0; t <= 90; t += 5) {
+      for (let az = 0; az < 360; az += 15) {
+        const f = orientationFactor(t, az);
+        expect(f).toBeGreaterThanOrEqual(0.2);
+        expect(f).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+  it('decreases as a 34° array turns away from south', () => {
+    let prev = Infinity;
+    for (let d = 0; d <= 180; d += 10) {
+      const f = orientationFactor(34, 180 + d);
+      expect(f).toBeLessThanOrEqual(prev + 1e-12);
+      prev = f;
+    }
+  });
+  it('normalises azimuth', () => {
+    expect(azimuthDeviation(-90)).toBe(90);
+    expect(azimuthDeviation(540)).toBe(0);
+  });
+  it('fallbackYield scales the table and validates', () => {
+    const r = fallbackYield(skopje.pvout, 0, 180);
+    expect(r.monthly[0]).toBeCloseTo(skopje.pvout[0] * r.factor, 9);
+    expect(isValidMonthly(r.monthly)).toBe(true);
+    expect(isValidMonthly([1, 2, 3])).toBe(false);
+    expect(isValidMonthly(new Array(12).fill(0))).toBe(false);
+  });
+});
+
+describe('theoretical annual coverage', () => {
+  it('is capped at 100% and labelled as theoretical', () => {
+    const r = evaluate({ monthlyYield: skopje.pvout, panelWp: 590, dailyConsumption: 1, mode: 'check', panels: 20, batteryKwh: 5 });
+    expect(r.theoreticalCoverage).toBe(100);
+    expect(r).not.toHaveProperty('selfSufficiency');
   });
 });
