@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   nightHours, worstMonth, ceilSafe, evaluate, loadSplit, batteryRequirement,
   reserveRefillDays, normalizeInputs, proportionalNightShare,
+  roundUpInverter, sizeInverter,
 } from '../src/calc.js';
 import { findCity } from '../src/data.js';
 
@@ -159,5 +160,41 @@ describe('evaluate: size mode vs check mode', () => {
     const r = evaluate({ ...base, mode: 'size', dodPct: 80 });
     expect(r.battery.chargePerDay).toBeCloseTo(r.load.night / 0.92, 9);
     expect(r.battery.grossNeeded).toBeCloseTo(r.load.night / 0.8, 9);
+  });
+});
+
+describe('inverter sizing', () => {
+  it('rounds up to common sizes', () => {
+    expect(roundUpInverter(2)).toBe(3);
+    expect(roundUpInverter(3)).toBe(3);
+    expect(roundUpInverter(3.2)).toBe(3.6);
+    expect(roundUpInverter(5.0000000001)).toBe(5);
+    expect(roundUpInverter(5.01)).toBe(6);
+    expect(roundUpInverter(10.5)).toBe(12);
+    expect(roundUpInverter(50)).toBe(50);
+    expect(roundUpInverter(51)).toBe(60);
+    expect(roundUpInverter(0)).toBe(3);
+  });
+
+  it('is driven by the PV array when kWp / ratio exceeds peak load', () => {
+    const inv = sizeInverter({ peakLoadKw: 5, kWp: 12, dcAcRatio: 1.2 });
+    expect(inv.fromPv).toBeCloseTo(10, 9);
+    expect(inv.raw).toBeCloseTo(10, 9);
+    expect(inv.size).toBe(10);
+    expect(inv.drivenBy).toBe('pv');
+  });
+
+  it('is driven by peak load for small arrays', () => {
+    const inv = sizeInverter({ peakLoadKw: 7, kWp: 6, dcAcRatio: 1.2 });
+    expect(inv.size).toBe(8);
+    expect(inv.drivenBy).toBe('load');
+  });
+
+  it('no longer oversizes relative to PV (v1 used kWp * 1.1, rounded to 5 kW steps)', () => {
+    const kWp = 18 * 0.59; // 10.62 kWp
+    const v1 = Math.ceil(Math.max(18 / 6, kWp * 1.1) / 5) * 5; // 11.68 -> 15 kW
+    const v2 = sizeInverter({ peakLoadKw: 5, kWp, dcAcRatio: 1.2 }).size; // 8.85 -> 10 kW
+    expect(v1).toBe(15);
+    expect(v2).toBe(10);
   });
 });

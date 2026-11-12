@@ -26,7 +26,12 @@ export const DEFAULTS = Object.freeze({
   nightSharePct: null,
   panels: 12,
   batteryKwh: 10,
+  peakLoadKw: 5,
+  dcAcRatio: 1.2,
 });
+
+/** Common inverter AC ratings (kW). */
+export const INVERTER_SIZES = [3, 3.6, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50];
 
 function num(v, fallback) {
   const n = typeof v === 'string' ? parseFloat(v.replace(',', '.')) : v;
@@ -53,6 +58,8 @@ export function normalizeInputs(raw = {}) {
     nightSharePct: share === null || share === undefined || share === '' ? null : clamp(num(share, 0), 0, 100),
     panels: clamp(Math.round(num(raw.panels, d.panels)), 0, 100000),
     batteryKwh: clamp(num(raw.batteryKwh, d.batteryKwh), 0, 100000),
+    peakLoadKw: clamp(num(raw.peakLoadKw, d.peakLoadKw), 0, 10000),
+    dcAcRatio: clamp(num(raw.dcAcRatio, d.dcAcRatio), 0.8, 1.6),
   };
 }
 
@@ -159,6 +166,28 @@ export function recommendPanels({ daytime, chargePerDay, perPanelWorst }) {
   return { panelsForDaytime, panelsForCharge, panels: Math.max(1, panelsForDaytime, panelsForCharge) };
 }
 
+/**
+ * Round up to the next common inverter size. Above the largest listed size,
+ * round up to the next 10 kW (several inverters / larger commercial units).
+ */
+export function roundUpInverter(kw) {
+  if (!(kw > 0)) return INVERTER_SIZES[0];
+  const hit = INVERTER_SIZES.find((s) => s >= kw - EPS);
+  return hit !== undefined ? hit : ceilSafe(kw / 10) * 10;
+}
+
+/**
+ * Inverter AC rating >= max(peak load, kWp / DC-AC ratio).
+ * A DC/AC ratio of ~1.1–1.3 is normal: panels rarely reach STC power, so the
+ * inverter may be smaller than the array (v1 oversized it with kWp * 1.1).
+ */
+export function sizeInverter({ peakLoadKw, kWp, dcAcRatio }) {
+  const fromLoad = Math.max(0, peakLoadKw);
+  const fromPv = dcAcRatio > 0 ? kWp / dcAcRatio : kWp;
+  const raw = Math.max(fromLoad, fromPv);
+  return { fromLoad, fromPv, raw, size: roundUpInverter(raw), drivenBy: fromPv > fromLoad ? 'pv' : 'load' };
+}
+
 function check(id, lhs, rhs, applicable = true) {
   if (!applicable) return { id, lhs, rhs, status: 'na' };
   return { id, lhs, rhs, status: lhs >= rhs - EPS ? 'pass' : 'fail' };
@@ -203,7 +232,7 @@ export function evaluate(input) {
 
   const solarDailyWorst = series.dailyProduction[worst.index];
   const surplusWorst = solarDailyWorst - load.daytime;
-  const inverterRaw = Math.max(p.dailyConsumption / 6, kWp * 1.1);
+  const inverter = sizeInverter({ peakLoadKw: p.peakLoadKw, kWp, dcAcRatio: p.dcAcRatio });
 
   const leftoverSurplus = surplusWorst - battery.chargePerDay;
   const reserve = mode === MODE_SIZE ? battery.reserve : Math.max(0, batteryUsable - load.night);
@@ -221,7 +250,7 @@ export function evaluate(input) {
     system: { panels, kWp, batteryGross, batteryUsable },
     series, annualProduction, annualConsumption, selfSufficiency,
     solarDailyWorst, surplusWorst, leftoverSurplus, reserve, refillDays,
-    inverterRaw, inverter: Math.ceil(inverterRaw / 5) * 5,
+    inverter,
     checks, verdict,
   };
 }
