@@ -8,7 +8,7 @@ import {
   MODE_SIZE, MODE_CHECK, INVERTER_SIZES,
 } from './calc.js';
 import { fmt as fmtNum } from './format.js';
-import { t, getLang, monthName } from './i18n.js';
+import { t, getLang, setLang, detectLang, monthName, LANGS } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const f = (n, d = 1) => fmtNum(n, d, getLang());
@@ -48,6 +48,11 @@ function formulaRows(rows) {
 /* ===================== STATIC TEXT ===================== */
 function applyStaticText() {
   document.documentElement.lang = getLang();
+  document.querySelectorAll('.lang button').forEach((b) => {
+    const on = b.dataset.lang === getLang();
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on);
+  });
   document.title = t('title');
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.innerHTML = t(el.dataset.i18n); });
   document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.dataset.i18nTitle); });
@@ -500,8 +505,28 @@ function setMode(mode) {
   render();
 }
 
-function init() {
+const LANG_KEY = 'solar-calc-lang';
+
+function initialLang() {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (LANGS.includes(saved)) return saved;
+  } catch { /* storage may be blocked (file://, privacy mode) */ }
+  return detectLang(navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]);
+}
+
+function switchLang(lang) {
+  setLang(lang);
+  try { localStorage.setItem(LANG_KEY, lang); } catch { /* ignore */ }
   applyStaticText();
+  populateCitySelect();
+  render();
+}
+
+function init() {
+  setLang(initialLang());
+  applyStaticText();
+  document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => switchLang(b.dataset.lang)));
   populateCitySelect();
   populateHourSelects();
   $('modeSize').addEventListener('click', () => setMode(MODE_SIZE));

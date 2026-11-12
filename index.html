@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="mk">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -210,6 +210,10 @@
   .source.offline{background:var(--orange-bg);border-color:var(--orange-line);color:#7A4A10;}
   .source.live{background:var(--green-bg);border-color:var(--green-line);color:#136B4E;}
   .source.loading{background:var(--bg);border-color:var(--line);color:var(--ink-soft);}
+  .lang{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff;}
+  .lang button{font-family:var(--mono);font-size:0.76rem;font-weight:700;padding:6px 11px;border:none;background:#fff;color:var(--ink-soft);cursor:pointer;}
+  .lang button + button{border-left:1px solid var(--line);}
+  .lang button.active{background:var(--ink);color:#fff;}
   .tip{cursor:help;color:var(--blue);font-weight:700;}
   .note.standalone{font-size:0.72rem;color:var(--ink-faint);margin:-8px 0 14px;}
   .step .scontent{font-size:0.84rem;}
@@ -225,6 +229,10 @@
       <h1>☀️ <span data-i18n="title"></span></h1>
       <p data-i18n="subtitle"></p>
       <span class="badge-estimate" data-i18n="badge"></span>
+    </div>
+    <div class="lang" role="group" data-i18n-title="langLabel">
+      <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      <button type="button" data-lang="mk" aria-pressed="false">МК</button>
     </div>
   </header>
 

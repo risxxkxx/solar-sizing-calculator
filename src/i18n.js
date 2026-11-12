@@ -1,8 +1,177 @@
 /**
- * UI strings. All user-facing text lives in this one dictionary.
+ * UI strings (English + Macedonian). All user-facing text lives here.
  * Placeholders use {name} and are filled by t(key, params).
  */
 export const STRINGS = {
+  en: {
+    title: 'Solar PV + battery sizing calculator',
+    subtitle: 'First-pass sizing of PV panels, battery and inverter for a household or small business, based on location, consumption and usage pattern. Every result can be checked through the formulas shown.',
+    badge: 'ⓘ Indicative estimate — not a replacement for professional PV design',
+
+    params: 'Parameters',
+    modeSize: 'Size for me',
+    modeCheck: 'Check my system',
+    modeSizeNote: 'The calculator recommends panels and a battery for the worst month.',
+    modeCheckNote: 'Enter your panels and battery — the three checks can genuinely fail.',
+
+    secLocation: 'Location',
+    city: 'City',
+    secSystem: 'System',
+    panelWp: 'Watts per panel (W)',
+    panelsInstalled: 'Number of panels',
+    tilt: 'Tilt',
+    tiltNote: '0° = flat roof, 90° = facade. 34° is close to optimal in North Macedonia.',
+    azimuth: 'Azimuth',
+    azimuthNote: '0° = north, 90° = east, 180° = south, 270° = west',
+    recommendedPanels: 'Recommended panels: <strong>{panels}</strong> ({kWp} kWp) — so that PV covers daytime use AND recharges the battery in the worst month ({month})',
+
+    secConsumption: 'Consumption',
+    consumption: 'Daily consumption (kWh/day)',
+    peakLoad: 'Peak load (kW)',
+    peakLoadNote: 'Largest simultaneous power draw (water heater + stove + AC…)',
+    nightStart: 'Night from',
+    nightEnd: 'Night until',
+    nightWindowNote: 'Hours without useful sun — the battery covers consumption then.',
+    nightShare: 'Share of consumption at night (%)',
+    nightShareAuto: 'proportional to hours (flat load)',
+
+    secBattery: 'Battery',
+    batteryInstalled: 'Installed battery (kWh, nominal)',
+    dod: 'Depth of discharge (DoD)',
+    efficiency: 'Round-trip efficiency',
+    efficiencyNote: 'LFP battery + inverter: typically 88–95%',
+    autonomy: 'Days of autonomy',
+    autonomyNote: '1 = one night. 0 = no battery. Monthly averages hide multi-day cloudy streaks — consider 2+ for critical loads.',
+
+    secInverter: 'Inverter',
+    dcAc: 'DC/AC ratio',
+    dcAcNote: 'Panel kWp ÷ inverter kW. Typically 1.1–1.3.',
+
+    sourceLive: 'Data source: <strong>PVGIS {version} (live)</strong> — {db}',
+    sourceLoading: 'Loading PVGIS data… showing the offline estimate meanwhile.',
+    sourcePvgisError: 'PVGIS returned no data for this point ({msg}).',
+    sourceInvalidCoords: 'Enter a valid latitude (−90…90) and longitude (−180…180).',
+    sourceNearest: '(nearest bundled city: {city})',
+    sourceNoProxy: 'Live PVGIS data is available when the site runs on Netlify (or "netlify dev").',
+    customLocation: 'Custom coordinates…',
+    lat: 'Latitude',
+    lng: 'Longitude',
+    sourceOffline: 'Data source: <strong>approximate offline estimate</strong> — regional table (34°/south) × orientation factor ×{factor}',
+    sourceOfflineTip: 'The table holds approximate regional values, not official Global Solar Atlas exports.',
+
+    recTitle: 'RECOMMENDED SYSTEM',
+    recText: '{panels} × {wp} W = {kWp} kWp, battery {gross} kWh nominal ({usable} kWh usable), inverter {inv} kW. Sized for the worst month ({month}).',
+    recTextNoBattery: '{panels} × {wp} W = {kWp} kWp, no battery (0 days of autonomy), inverter {inv} kW. Sized for the worst month ({month}).',
+    recButton: 'Check this system →',
+    passTitle: 'THE SYSTEM PASSES THE CHECKS',
+    passText: 'In the worst month ({month}) the system passes every check below (based on monthly averages).',
+    failTitle: 'THE SYSTEM FAILS THE CHECKS',
+    failText: 'In the worst month ({month}) at least one check fails — see details below.',
+
+    checksTitleSize: 'How the recommendation is derived (worst month)',
+    checksTitleCheck: 'Detailed check (worst month)',
+    chkDaytimeTitle: '1. Daytime coverage in the worst month ({month})',
+    chkDaytimeDetail: 'production {lhs} kWh/day {op} daytime consumption {rhs} kWh',
+    chkDaytimePass: 'PV covers daytime consumption in the worst month.',
+    chkDaytimeFail: 'PV does not even cover daytime consumption in the worst month.',
+    chkDaytimeSize: 'Condition A: enough panels for daytime consumption.',
+    chkRechargeTitle: '2. Daily surplus to recharge the battery',
+    chkRechargeDetail: 'surplus {lhs} kWh {op} required charge {rhs} kWh (night use ÷ efficiency)',
+    chkRechargePass: 'The daytime surplus refills what is used at night.',
+    chkRechargeFail: 'The daytime surplus cannot refill the battery every day.',
+    chkRechargeSize: 'Condition B: enough panels to recharge the battery as well.',
+    chkNightTitle: '3. Battery covers the requirement (night + autonomy)',
+    chkNightDetail: 'usable capacity {lhs} kWh {op} required {rhs} kWh',
+    chkNightPass: 'The installed battery is large enough.',
+    chkNightFail: 'The installed battery is too small.',
+    chkNightSize: 'The battery is sized to exactly the required usable capacity.',
+    chkNa: 'Not applicable — 0 days of autonomy (no battery).',
+
+    mSystemRec: 'System (recommended)',
+    mSystemYours: 'Your system',
+    mSystemSub: '{panels} panels × {wp} W · worst month: {month}',
+    mAnnual: 'Annual production',
+    mAnnualSub: 'sum of 12 months',
+    mCoverage: 'Theoretical annual coverage',
+    mCoverageSub: 'upper bound — not self-sufficiency',
+    mCoverageTip: 'Annual production ÷ annual consumption, capped at 100%. It ignores timing: summer surplus cannot cover the winter deficit, and daytime production cannot cover the night without storage. Real self-sufficiency is lower.',
+    mBatUsable: 'Battery required (usable)',
+    mBatUsableSub: 'night + {extra} extra days',
+    mBatGross: 'Battery required (nominal)',
+    mBatGrossSub: 'DoD-corrected',
+    mBatInstalled: 'Installed battery',
+    mBatInstalledSub: '{usable} kWh usable at {dod}% DoD',
+    mInverter: 'Recommended inverter',
+    mInverterSub: 'calculated {raw} kW → standard size',
+
+    formula: '📐 Formula',
+    fFormula: 'Formula',
+    fSubst: 'Substitution',
+    fResult: 'Result',
+    fCondA: 'Condition A',
+    fCondB: 'Condition B',
+    fRec: 'Recommendation',
+    fWorst: 'Worst month',
+    fSum: 'Σ monthly_production',
+    fSumSubst: 'sum of all 12 monthly values',
+    fPanelsA: 'panels ≥ daytime_use ÷ (worst_kWh/kWp/day × Wp ÷ 1000)',
+    fPanelsB: 'panels ≥ (daytime_use + charge) ÷ (worst_kWh/kWp/day × Wp ÷ 1000)',
+    fPanelsMax: 'panels = max(A, B)',
+    fKwp: 'kWp = panels × Wp ÷ 1000',
+    fCoverage: 'min(prod., cons.) ÷ cons. × 100',
+    fUsable: 'usable = night_use + (days − 1) × daily_use',
+    fUsableZero: 'days = 0 → no battery',
+    fGross: 'nominal = usable ÷ DoD',
+    fInstalled: 'usable = installed × DoD',
+    fInverter: 'AC ≥ max(peak_load, kWp ÷ DC/AC)',
+    fInverterRound: 'round up to: {sizes} kW',
+    fPvgis: 'E_m = monthly energy for 1 kWp from PVGIS PVcalc (14% loss, incl. horizon)',
+    fOrientation: 'f(tilt, d) = a + b·cos(d) + c·cos(2d), d = deviation from south',
+    fNightWrap: '24 − start + end',
+    fNightPlain: 'end − start',
+    fShareProp: 'share = night_hours ÷ 24 × 100',
+    fShareUser: 'share = user input',
+    fNightKwh: 'night_use = daily_use × share',
+    fCharge: 'charge = night_use ÷ efficiency',
+    fSurplus: 'surplus = worst_daily_prod. − daytime_use',
+    fRefill: 'days = reserve ÷ efficiency ÷ leftover_surplus',
+
+    chartTitle: 'Monthly production vs consumption',
+    chartProd: 'Production (kWh)',
+    chartCons: 'Consumption (kWh)',
+    tableTitle: 'Monthly table',
+    thMonth: 'Month',
+    thProd: 'Production kWh',
+    thCons: 'Consumption kWh',
+    thDaily: 'Daily prod. kWh/d',
+    thBalance: 'Surplus / Deficit',
+    thStatus: 'Status',
+    surplus: 'Surplus',
+    deficit: 'Deficit',
+
+    stepsTitle: 'Battery calculation — step by step',
+    stNightTitle: 'Night window',
+    stNightText: 'From {start} to {end}{wrap} → <span class="sval">{hours} hours</span>',
+    stWrap: ' (over midnight)',
+    stShareTitle: 'Night consumption',
+    stShareText: 'Night share {share}% → <span class="sval">{night} kWh</span> at night, {day} kWh during the day',
+    stUsableTitle: 'Required usable capacity ({days} day(s) of autonomy)',
+    stGrossTitle: 'With {dod}% DoD → required nominal capacity',
+    stChargeTitle: 'Daily charging energy ({eff}% efficiency)',
+    stRechargeTitle: 'Does the daytime surplus recharge the battery in the weakest month ({month})?',
+    stRechargeText: 'Daily surplus: <span class="sval">{prod} − {day} = {surplus} kWh</span> · Required charge: <span class="sval">{charge} kWh</span>',
+    stYes: 'YES',
+    stNo: 'NO',
+    stReserveTitle: 'Refilling the autonomy reserve',
+    stReserveText: 'Reserve {reserve} kWh, leftover surplus in {month}: {leftover} kWh/day → <span class="sval">{days}</span>',
+    stReserveDays: '≈ {n} days',
+    stReserveNever: 'does not refill in {month} (refills in sunnier months)',
+    stNoBattery: '0 days of autonomy — no battery is sized; night consumption comes from the grid.',
+
+    footer: 'Results are based on monthly averages and are meant for first-pass estimates. Shading, multi-day cloudy periods and temperature are not modelled (except for the losses built into PVGIS). Consult a licensed PV installer for the final design.',
+    hoursUnit: 'h',
+    langLabel: 'Language',
+  },
   mk: {
     title: 'Калкулатор за димензионирање на сончев систем',
     subtitle: 'Првична пресметка на фотонапонски панели, батерија и инвертер за домаќинство или мал бизнис, врз основа на локацијата, потрошувачката и режимот на користење. Секој резултат може да се провери преку прикажаните формули.',
@@ -176,17 +345,29 @@ export const STRINGS = {
 
     footer: 'Резултатите се засноваат на месечни просеци и служат за првична процена. Не се моделираат засенчување, облачни периоди и температура (освен загубите вградени во PVGIS). За конечен дизајн консултирај се со лиценциран PV инсталатер.',
     hoursUnit: 'ч',
+    langLabel: 'Јазик',
   },
 };
 
 const MONTHS = {
+  en: {
+    short: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    full: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  },
   mk: {
     short: ['Јан', 'Фев', 'Мар', 'Апр', 'Мај', 'Јун', 'Јул', 'Авг', 'Сеп', 'Окт', 'Ное', 'Дек'],
     full: ['Јануари', 'Февруари', 'Март', 'Април', 'Мај', 'Јуни', 'Јули', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'],
   },
 };
 
-let current = 'mk';
+export const LANGS = ['en', 'mk'];
+let current = 'en';
+
+/** 'mk' if any preferred browser language is Macedonian, otherwise 'en'. */
+export function detectLang(languages = []) {
+  const list = Array.isArray(languages) ? languages : [languages];
+  return list.some((l) => typeof l === 'string' && l.toLowerCase().startsWith('mk')) ? 'mk' : 'en';
+}
 
 export function getLang() {
   return current;
@@ -198,11 +379,11 @@ export function setLang(lang) {
 }
 
 export function t(key, params = {}) {
-  const dict = STRINGS[current] || STRINGS.mk;
-  const s = dict[key] ?? STRINGS.mk[key] ?? key;
+  const dict = STRINGS[current] || STRINGS.en;
+  const s = dict[key] ?? STRINGS.en[key] ?? key;
   return s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m));
 }
 
 export function monthName(i, kind = 'full') {
-  return (MONTHS[current] || MONTHS.mk)[kind][i];
+  return (MONTHS[current] || MONTHS.en)[kind][i];
 }
