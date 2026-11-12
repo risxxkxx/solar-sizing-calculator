@@ -2,9 +2,9 @@
  * UI layer: reads inputs, calls the pure engine (calc.js), renders results.
  * All maths lives in calc.js; this file only formats and draws.
  */
-import { CITIES, findCity } from './data.js';
+import { CITIES, findCity, nearestCity } from './data.js';
 import {
-  evaluate, fallbackYield, normalizeInputs, proportionalNightShare, azimuthDeviation,
+  evaluate, fallbackYield, normalizeInputs, proportionalNightShare, azimuthDeviation, isValidMonthly,
   MODE_SIZE, MODE_CHECK, INVERTER_SIZES,
 } from './calc.js';
 import { fmt as fmtNum } from './format.js';
@@ -15,7 +15,19 @@ const f = (n, d = 1) => fmtNum(n, d, getLang());
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const hh = (h) => String(h).padStart(2, '0') + ':00';
 
-const state = { mode: MODE_SIZE };
+const state = {
+  mode: MODE_SIZE,
+  pvgis: {
+    available: null, // null = unknown, true = proxy answered, false = no proxy (file://, plain static server, offline)
+    cache: new Map(), // key -> proxy response
+    errors: new Map(), // key -> error message (location errors, transient upstream errors)
+    pendingKey: null,
+    timer: null,
+  },
+};
+
+const PVGIS_ENDPOINT = '/api/pvgis';
+const canTryPvgis = () => location.protocol === 'http:' || location.protocol === 'https:';
 
 /* ===================== FORMULA DISCLOSURES ===================== */
 function formulaBlock(formula, substituted, result) {
@@ -43,9 +55,12 @@ function applyStaticText() {
 
 function populateCitySelect() {
   const sel = $('city');
-  const prev = sel.value || 'skopje';
-  sel.innerHTML = CITIES.map((c) => `<option value="${c.id}">${esc(c.name[getLang()] || c.name.mk)}</option>`).join('');
-  sel.value = findCity(prev) ? prev : 'skopje';
+  let prev = sel.value || 'skopje';
+  const allowCustom = state.pvgis.available === true;
+  if (prev === 'custom' && !allowCustom) prev = currentLocation().fallbackCity.id;
+  sel.innerHTML = CITIES.map((c) => `<option value="${c.id}">${esc(c.name[getLang()] || c.name.mk)}</option>`).join('')
+    + (allowCustom ? `<option value="custom">${esc(t('customLocation'))}</option>` : '');
+  sel.value = prev === 'custom' || findCity(prev) ? prev : 'skopje';
 }
 
 function populateHourSelects() {
@@ -80,12 +95,67 @@ function readOrientation() {
   return { tilt: +$('tilt').value, azimuth: +$('azimuth').value };
 }
 
-/** Monthly specific yield (kWh/kWp) + a description of where it came from. */
+function currentLocation() {
+  if ($('city').value === 'custom') {
+    const lat = parseFloat(String($('lat').value).replace(',', '.'));
+    const lng = parseFloat(String($('lng').value).replace(',', '.'));
+    const valid = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+    const near = valid ? nearestCity(lat, lng) : findCity('skopje');
+    return { custom: true, valid, lat: valid ? Math.round(lat * 100) / 100 : near.lat, lng: valid ? Math.round(lng * 100) / 100 : near.lng, fallbackCity: near };
+  }
+  const c = findCity($('city').value) || findCity('skopje');
+  return { custom: false, valid: true, lat: c.lat, lng: c.lng, fallbackCity: c };
+}
+
+/**
+ * Monthly specific yield (kWh/kWp) + where it came from.
+ * Live PVGIS data when the proxy answers; otherwise the bundled table x the
+ * approximate offline orientation model.
+ */
 function getYield() {
-  const city = findCity($('city').value);
+  const loc = currentLocation();
   const { tilt, azimuth } = readOrientation();
-  const fb = fallbackYield(city.pvout, tilt, azimuth);
-  return { monthly: fb.monthly, source: { kind: 'offline', factor: fb.factor, tilt, azimuth }, lat: city.lat, lng: city.lng };
+  const fb = fallbackYield(loc.fallbackCity.pvout, tilt, azimuth);
+  const base = { lat: loc.lat, lng: loc.lng, custom: loc.custom };
+  const offline = (reason, extra = {}) => ({
+    ...base, monthly: fb.monthly,
+    source: { kind: 'offline', reason, factor: fb.factor, tilt, azimuth, city: loc.fallbackCity, custom: loc.custom, ...extra },
+  });
+
+  if (!canTryPvgis() || state.pvgis.available === false) return offline('unavailable');
+  if (!loc.valid) return offline('invalidCoords');
+  const key = `${loc.lat.toFixed(2)},${loc.lng.toFixed(2)},${tilt},${azimuth}`;
+  const hit = state.pvgis.cache.get(key);
+  if (hit) return { ...base, monthly: hit.monthly, source: { kind: 'pvgis', ...hit } };
+  if (state.pvgis.errors.has(key)) return offline('pvgisError', { message: state.pvgis.errors.get(key) });
+  schedulePvgis(key, { lat: loc.lat, lng: loc.lng, tilt, azimuth });
+  return offline('loading');
+}
+
+function schedulePvgis(key, q) {
+  if (state.pvgis.pendingKey === key) return;
+  state.pvgis.pendingKey = key;
+  clearTimeout(state.pvgis.timer);
+  // debounce slider drags; first probe goes out immediately
+  state.pvgis.timer = setTimeout(() => fetchPvgis(key, q), state.pvgis.available ? 450 : 0);
+}
+
+async function fetchPvgis(key, q) {
+  const before = state.pvgis.available;
+  try {
+    const res = await fetch(`${PVGIS_ENDPOINT}?${new URLSearchParams(q)}`, { headers: { Accept: 'application/json' } });
+    // A plain static server answers 404 with HTML: there is no proxy.
+    if (!(res.headers.get('content-type') || '').includes('application/json')) throw new Error('no proxy');
+    const body = await res.json();
+    state.pvgis.available = true;
+    if (res.ok && isValidMonthly(body.monthly)) state.pvgis.cache.set(key, body);
+    else state.pvgis.errors.set(key, (body && body.error) || `HTTP ${res.status}`);
+  } catch {
+    state.pvgis.available = false;
+  }
+  if (state.pvgis.pendingKey === key) state.pvgis.pendingKey = null;
+  if (before !== state.pvgis.available) populateCitySelect();
+  render();
 }
 
 function syncSliderLabels() {
@@ -118,7 +188,8 @@ function render() {
   $('modeSize').setAttribute('aria-pressed', r.mode === MODE_SIZE);
   $('modeCheck').setAttribute('aria-pressed', r.mode === MODE_CHECK);
   $('modeNote').textContent = r.mode === MODE_SIZE ? t('modeSizeNote') : t('modeCheckNote');
-  $('cityCoords').textContent = `φ ${y.lat}°, λ ${y.lng}°`;
+  document.body.dataset.custom = y.custom ? '1' : '0';
+  $('cityCoords').textContent = y.custom ? '' : `φ ${y.lat}°, λ ${y.lng}°`;
 
   $('panelsComputedNote').innerHTML = Number.isFinite(r.sizing.panels)
     ? t('recommendedPanels', { panels: r.sizing.panels, kWp: f((r.sizing.panels * p.panelWp) / 1000, 2), month })
@@ -137,8 +208,22 @@ function render() {
 /* ===================== DATA SOURCE ===================== */
 function renderSource(y) {
   const s = y.source;
+  if (s.kind === 'pvgis') {
+    const years = Array.isArray(s.years) ? `, ${s.years[0]}–${s.years[1]}` : '';
+    $('sourceNote').innerHTML = `<div class="source live">${t('sourceLive', { version: esc(s.version), db: esc(s.radiationDb || 'PVGIS') + years })}</div>`
+      + formulaBlock(t('fPvgis'), `lat=${s.lat}, lon=${s.lng}, angle=${s.tilt}, aspect=${s.azimuth}−180=${s.aspect}, loss=${s.lossPct}%`, `${f(s.annual, 0)} kWh/kWp`);
+    return;
+  }
   const dev = azimuthDeviation(s.azimuth);
-  $('sourceNote').innerHTML = `<div class="source offline" title="${esc(t('sourceOfflineTip'))}">${t('sourceOffline', { factor: f(s.factor, 3) })}</div>`
+  const cityName = esc(s.city.name[getLang()] || s.city.name.mk);
+  let lead = '';
+  if (s.reason === 'loading') lead = `<div class="source loading">${t('sourceLoading')}</div>`;
+  else if (s.reason === 'pvgisError') lead = `<div class="source loading">${t('sourcePvgisError', { msg: esc(s.message) })}</div>`;
+  else if (s.reason === 'invalidCoords') lead = `<div class="source loading">${t('sourceInvalidCoords')}</div>`;
+  const near = s.custom ? ` ${t('sourceNearest', { city: cityName })}` : '';
+  const hint = s.reason === 'unavailable' ? `<div class="note">${t('sourceNoProxy')}</div>` : '';
+  $('sourceNote').innerHTML = lead
+    + `<div class="source offline" title="${esc(t('sourceOfflineTip'))}">${t('sourceOffline', { factor: f(s.factor, 3) })}${near}</div>${hint}`
     + formulaBlock(t('fOrientation'), `tilt ${s.tilt}°, d = ${dev}°`, `× ${f(s.factor, 3)}`);
 }
 

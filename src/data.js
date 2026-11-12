@@ -29,3 +29,16 @@ export const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 export function findCity(id) {
   return CITIES.find((c) => c.id === id) || null;
 }
+
+/** Nearest bundled city (equirectangular distance; fine at this scale). */
+export function nearestCity(lat, lng) {
+  let best = CITIES[0];
+  let bestD = Infinity;
+  for (const c of CITIES) {
+    const dx = (c.lng - lng) * Math.cos((lat * Math.PI) / 180);
+    const dy = c.lat - lat;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}

@@ -48,6 +48,15 @@ export const STRINGS = {
     dcAcNote: 'kWp панели ÷ kW инвертер. Типично 1,1–1,3.',
 
     sourceOffline: 'Извор на податоци: <strong>приближна офлајн процена</strong> — регионална табела (34°/југ) × фактор за ориентација ×{factor}',
+    sourceLive: 'Извор на податоци: <strong>PVGIS {version} (во живо)</strong> — {db}',
+    sourceLoading: 'Се вчитуваат PVGIS податоци… во меѓувреме: офлајн процена.',
+    sourcePvgisError: 'PVGIS не врати податоци за оваа точка ({msg}).',
+    sourceInvalidCoords: 'Внеси валидна географска ширина (−90…90) и должина (−180…180).',
+    sourceNearest: '(најблизок град од табелата: {city})',
+    sourceNoProxy: 'Податоци во живо од PVGIS се достапни кога страницата работи на Netlify (или „netlify dev“).',
+    customLocation: 'Сопствени координати…',
+    lat: 'Ширина (lat)',
+    lng: 'Должина (lng)',
     sourceOfflineTip: 'Табелата содржи приближни регионални вредности, не официјални GSA податоци.',
 
     // verdict
@@ -120,6 +129,7 @@ export const STRINGS = {
     fInstalled: 'корисно = инсталирано × DoD',
     fInverter: 'AC ≥ max(врвно_оптоварување, kWp ÷ DC/AC)',
     fInverterRound: 'заокружи нагоре на: {sizes} kW',
+    fPvgis: 'E_m = месечна енергија за 1 kWp од PVGIS PVcalc (загуби 14%, вкл. хоризонт)',
     fOrientation: 'f(тилт, d) = a + b·cos(d) + c·cos(2d), d = отстапување од југ',
     fNightWrap: '24 − почеток + крај',
     fNightPlain: 'крај − почеток',
