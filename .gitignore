@@ -1,6 +1,7 @@
 node_modules/
 .netlify/
 coverage/
+# dist/app.bundle.js is generated but committed on purpose (file:// support)
 *.log
 .DS_Store
 .env

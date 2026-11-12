@@ -387,6 +387,19 @@
   <footer class="note" data-i18n="footer"></footer>
 </div>
 
-<script type="module" src="./src/ui.js"></script>
+<script>
+  // Chromium blocks ES modules on file:// URLs. When opened from disk, load the
+  // prebuilt classic bundle (npm run bundle); otherwise load the ES modules.
+  (function () {
+    var s = document.createElement('script');
+    if (location.protocol === 'file:') {
+      s.src = 'dist/app.bundle.js';
+    } else {
+      s.type = 'module';
+      s.src = 'src/ui.js';
+    }
+    document.body.appendChild(s);
+  })();
+</script>
 </body>
 </html>
