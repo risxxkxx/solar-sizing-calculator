@@ -29,19 +29,42 @@ describe('worstMonth', () => {
   });
 });
 
-describe('v1 engine (documents current behaviour)', () => {
+describe('evaluate: size mode vs check mode', () => {
   const base = { monthlyYield: skopje.pvout, panelWp: 590, dailyConsumption: 18, dodPct: 95 };
 
-  it('auto-sized panels cover daytime load plus battery charge in the worst month', () => {
-    const r = evaluate(base);
-    expect(r.solarDailyWorst).toBeGreaterThanOrEqual(r.daytime + r.batteryGross - 1e-9);
+  it('size mode returns a recommendation, not a pass/fail verdict', () => {
+    const r = evaluate({ ...base, mode: 'size' });
+    expect(r.verdict).toBe('recommendation');
+    expect(r.system.panels).toBeGreaterThan(0);
   });
 
-  it('FLAW: the verdict can never be red, whatever the inputs', () => {
-    for (const dailyConsumption of [0.5, 5, 18, 80, 400]) {
-      for (const dodPct of [70, 85, 100]) {
-        expect(evaluate({ ...base, dailyConsumption, dodPct }).allPass).toBe(true);
-      }
+  it('the auto-sized system passes all checks when entered in check mode', () => {
+    for (const dailyConsumption of [2, 18, 60]) {
+      const rec = evaluate({ ...base, dailyConsumption, mode: 'size' });
+      const chk = evaluate({
+        ...base, dailyConsumption, mode: 'check',
+        panels: rec.system.panels, batteryKwh: rec.system.batteryGross,
+      });
+      expect(chk.verdict).toBe('pass');
     }
+  });
+
+  it('check mode fails when the battery is undersized', () => {
+    const r = evaluate({ ...base, mode: 'check', panels: 40, batteryKwh: 2 });
+    expect(r.checks.find((c) => c.id === 'night').status).toBe('fail');
+    expect(r.verdict).toBe('fail');
+  });
+
+  it('check mode fails when the array is undersized', () => {
+    const r = evaluate({ ...base, mode: 'check', panels: 3, batteryKwh: 20 });
+    expect(r.checks.find((c) => c.id === 'daytime').status).toBe('fail');
+    expect(r.checks.find((c) => c.id === 'recharge').status).toBe('fail');
+    expect(r.verdict).toBe('fail');
+  });
+
+  it('daily recharge requirement is the discharged (usable) energy, not gross capacity', () => {
+    const r = evaluate({ ...base, mode: 'size', dodPct: 80 });
+    expect(r.battery.chargePerDay).toBeCloseTo(r.load.night, 9);
+    expect(r.battery.grossNeeded).toBeCloseTo(r.load.night / 0.8, 9);
   });
 });
