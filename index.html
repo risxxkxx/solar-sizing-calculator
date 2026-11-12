@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калкулатор за сончев систем — PV + Батерија</title>
+<style>
+  :root{
+    --green:#1D9E75;   --green-bg:#E8F6F0;  --green-line:#BFE6D7;
+    --red:#E24B4A;     --red-bg:#FBEAEA;    --red-line:#F3C7C6;
+    --blue:#378ADD;    --blue-bg:#EAF2FC;   --blue-line:#C4DEF7;
+    --orange:#C97A1E;  --orange-bg:#FCF1E1; --orange-line:#F0D6AC;
+    --ink:#1A1D1F; --ink-soft:#5B6168; --ink-faint:#8A9097;
+    --line:#E2E5E9; --bg:#F4F5F6; --card:#FFFFFF;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:var(--sans);
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px;}
+
+  /* ---------- header ---------- */
+  header.top{padding:8px 0 22px;border-bottom:1px solid var(--line);margin-bottom:22px;}
+  header.top h1{font-size:1.55rem;font-weight:800;letter-spacing:-0.01em;margin:0 0 6px;}
+  header.top p{margin:0;color:var(--ink-soft);font-size:0.92rem;max-width:760px;}
+  .badge-estimate{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--blue-bg);color:#1F5FA8;border:1px solid var(--blue-line);
+    font-size:0.74rem;font-weight:600;padding:3px 9px;border-radius:999px;margin-top:10px;
+  }
+
+  /* ---------- layout ---------- */
+  .layout{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start;}
+  @media (max-width:900px){.layout{grid-template-columns:1fr;}}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:18px 18px 20px;
+  }
+  .card + .card{margin-top:18px;}
+  .card h2{font-size:0.98rem;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+  .card h2 .num{
+    font-family:var(--mono);font-size:0.72rem;font-weight:700;color:var(--ink-faint);
+    border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+  }
+
+  .controls-card{position:sticky;top:16px;}
+  @media (max-width:900px){.controls-card{position:static;}}
+
+  /* ---------- form controls ---------- */
+  .field{margin-bottom:16px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:0.82rem;font-weight:600;color:var(--ink);margin-bottom:6px;
+  }
+  .field label .val{
+    font-family:var(--mono);font-weight:700;color:var(--blue);
+    background:var(--blue-bg);border-radius:5px;padding:1px 7px;font-size:0.8rem;
+  }
+  .field .note{font-size:0.72rem;color:var(--ink-faint);margin-top:5px;}
+  select, input[type=number]{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:7px;
+    font-family:var(--sans);font-size:0.88rem;color:var(--ink);background:#fff;
+  }
+  input[type=range]{
+    width:100%;height:4px;border-radius:3px;background:var(--line);
+    outline:none;-webkit-appearance:none;appearance:none;margin:4px 0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:17px;height:17px;border-radius:50%;
+    background:var(--blue);border:2px solid #fff;box-shadow:0 0 0 1px var(--blue);cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:17px;height:17px;border-radius:50%;background:var(--blue);
+    border:2px solid #fff;box-shadow:0 0 0 1px var(--blue);cursor:pointer;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0;}
+  .subhead{font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-faint);margin:0 0 10px;}
+
+  /* ---------- computed (auto) readout ---------- */
+  .computed-note{
+    font-size:0.78rem;background:var(--blue-bg);border:1px solid var(--blue-line);
+    border-radius:7px;padding:9px 11px;margin-bottom:16px;color:#1F5FA8;
+  }
+  .computed-note strong{font-family:var(--mono);font-weight:800;}
+
+  /* ---------- verdict banner ---------- */
+  .verdict{
+    border-radius:var(--radius);padding:20px;border:1px solid;display:flex;gap:16px;align-items:center;
+    flex-wrap:wrap;
+  }
+  .verdict.green{background:var(--green-bg);border-color:var(--green-line);}
+  .verdict.red{background:var(--red-bg);border-color:var(--red-line);}
+  .verdict .icon{font-size:2rem;line-height:1;}
+  .verdict .text{flex:1;min-width:220px;}
+  .verdict .text h3{margin:0 0 4px;font-size:1.18rem;font-weight:800;letter-spacing:-0.01em;}
+  .verdict.green h3{color:#136B4E;}
+  .verdict.red h3{color:#962323;}
+  .verdict .text p{margin:0;font-size:0.86rem;color:var(--ink-soft);}
+
+  /* ---------- metric cards ---------- */
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px;}
+  @media (max-width:760px){.metrics{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:480px){.metrics{grid-template-columns:1fr;}}
+  .metric{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .metric .mlabel{font-size:0.72rem;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
+  .metric .mvalue{font-family:var(--mono);font-size:1.5rem;font-weight:800;margin:4px 0 2px;color:var(--ink);}
+  .metric .msub{font-size:0.74rem;color:var(--ink-soft);}
+
+  /* ---------- formula disclosure ---------- */
+  details.formula{margin-top:10px;}
+  details.formula summary{
+    cursor:pointer;font-size:0.74rem;color:var(--blue);font-weight:600;list-style:none;
+    display:inline-flex;align-items:center;gap:4px;user-select:none;
+  }
+  details.formula summary::-webkit-details-marker{display:none;}
+  details.formula summary::before{content:'▸';font-size:0.65rem;transition:transform .15s ease;}
+  details.formula[open] summary::before{transform:rotate(90deg);}
+  .formula-body{
+    margin-top:8px;padding:10px 12px;background:#FAFBFC;border:1px solid var(--line);
+    border-radius:7px;font-size:0.78rem;
+  }
+  .f-line{display:flex;gap:8px;padding:3px 0;flex-wrap:wrap;}
+  .f-label{color:var(--ink-faint);min-width:62px;flex-shrink:0;font-weight:600;}
+  .f-mono{font-family:var(--mono);color:var(--ink);word-break:break-word;}
+  .f-result{color:var(--green);font-weight:700;}
+
+  /* ---------- chart ---------- */
+  .chart-wrap{height:320px;position:relative;}
+
+  /* ---------- table ---------- */
+  table.monthly{width:100%;border-collapse:collapse;font-size:0.82rem;}
+  table.monthly th, table.monthly td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);}
+  table.monthly th{font-size:0.7rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-faint);font-weight:700;}
+  table.monthly td.num{font-family:var(--mono);text-align:right;}
+  table.monthly tr:last-child td{border-bottom:none;}
+  .status-pill{
+    display:inline-block;padding:2px 9px;border-radius:999px;font-size:0.72rem;font-weight:700;
+  }
+  .status-pill.ok{background:var(--green-bg);color:var(--green);}
+  .status-pill.bad{background:var(--red-bg);color:var(--red);}
+  .tbl-scroll{overflow-x:auto;}
+
+  /* ---------- battery steps ---------- */
+  .steps{display:flex;flex-direction:column;gap:10px;}
+  .step{
+    display:flex;gap:12px;align-items:flex-start;padding:12px 14px;background:#FAFBFC;
+    border:1px solid var(--line);border-radius:8px;
+  }
+  .step .sidx{
+    font-family:var(--mono);font-weight:800;font-size:0.78rem;color:#fff;background:var(--blue);
+    width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .step .scontent{flex:1;}
+  .step .stitle{font-size:0.84rem;font-weight:700;margin-bottom:2px;}
+  .step .sval{font-family:var(--mono);font-size:0.9rem;font-weight:700;color:var(--blue);}
+  .step.yes .sidx{background:var(--green);}
+  .step.no .sidx{background:var(--red);}
+
+  footer.note{
+    margin-top:28px;padding-top:16px;border-top:1px solid var(--line);
+    font-size:0.74rem;color:var(--ink-faint);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>☀️ Калкулатор за димензионирање на сончев систем</h1>
+    <p>Пресметка на потребен капацитет на фотонапонски панели и батерија за домаќинство, врз основа на локацијата, потрошувачката и режимот на користење. Сите резултати може да се проверат преку прикажаните формули.</p>
+    <span class="badge-estimate">ⓘ PVOUT податоците се приближни вредности изведени од регионални GSA модели — не се замена за професионален PV дизајн</span>
+  </header>
+
+  <div class="layout">
+
+    <!-- ============ CONTROLS ============ -->
+    <div class="controls-card card">
+      <h2>Параметри</h2>
+
+      <div class="field">
+        <label for="city">Град</label>
+        <select id="city"></select>
+        <div class="note" id="cityCoords"></div>
+      </div>
+
+      <hr class="sep">
+      <p class="subhead">Систем</p>
+
+      <div class="field">
+        <label for="wp">Watt по панел (W)</label>
+        <input type="number" id="wp" min="50" max="1000" step="5" value="590" placeholder="напр. 590">
+      </div>
+
+      <div class="computed-note" id="panelsComputedNote">
+        Потребни панели: <strong>—</strong>
+      </div>
+
+      <div class="field">
+        <label for="tilt">Тилт (наклон) <span class="val" id="tiltVal"></span></label>
+        <input type="range" id="tilt" min="0" max="90" step="1" value="34">
+        <div class="note">34° е оптимум за Македонија</div>
+      </div>
+
+      <div class="field">
+        <label for="azimuth">Азимут <span class="val" id="azimuthVal"></span></label>
+        <input type="range" id="azimuth" min="0" max="359" step="1" value="180">
+        <div class="note">180° = југ = оптимум</div>
+      </div>
+
+      <hr class="sep">
+      <p class="subhead">Потрошувачка</p>
+
+      <div class="field">
+        <label for="consumption">Дневна потрошувачка (kWh/ден)</label>
+        <input type="number" id="consumption" min="0" step="0.5" value="18" placeholder="напр. 84">
+      </div>
+
+      <hr class="sep">
+      <p class="subhead">Батерија</p>
+
+      <div class="field">
+        <label for="dod">Длабочина на празнење (DoD) <span class="val" id="dodVal"></span></label>
+        <input type="range" id="dod" min="70" max="100" step="1" value="95">
+      </div>
+    </div>
+
+    <!-- ============ RESULTS ============ -->
+    <div class="results">
+
+      <div id="verdictBox"></div>
+
+      <div class="card">
+        <h2><span class="num">✓/✗</span> Детална проверка (најлош месец)</h2>
+        <div class="steps" id="verdictChecks"></div>
+      </div>
+
+      <div class="metrics" id="metricsBox"></div>
+
+      <div class="card">
+        <h2><span class="num">①</span> Месечно производство наспроти потрошувачка</h2>
+        <div class="chart-wrap" id="monthlyChart"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">②</span> Месечна табела</h2>
+        <div class="tbl-scroll">
+          <table class="monthly">
+            <thead>
+              <tr><th>Месец</th><th style="text-align:right">Производство kWh</th><th style="text-align:right">Потрошувачка kWh</th><th style="text-align:right">Дневно произв. kWh/д</th><th style="text-align:right">Вишок / Дефицит</th><th>Статус</th></tr>
+            </thead>
+            <tbody id="monthlyTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">③</span> Пресметка на батерија — чекор по чекор</h2>
+        <div class="steps" id="batterySteps"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="note">
+    Сите вредности за сончево зрачење (PVOUT) се приближни регионални проценки базирани на GSA модели за тилт 34° / азимут 180°, корегирани со едноставен приближен фактор за избраниот тилт и азимут. Резултатите служат за првична процена и ориентациона големина на системот — за конечен дизајн консултирај се со лиценциран PV инсталатер.
+  </footer>
+
+</div>
+
+<script>
+/* ===================== DATA ===================== */
+const CITIES = {
+  "Градско":    { lat:41.57, lng:21.96, pvout:[73.2,92.9,122.7,128.9,140.4,147.8,158.3,153.7,128.1,110.6,77.4,63.7] },
+  "Скопје":     { lat:41.99, lng:21.43, pvout:[71.5,90.8,120.3,126.5,138.2,145.9,156.1,151.4,126.0,108.5,75.8,62.1] },
+  "Битола":     { lat:41.03, lng:21.33, pvout:[75.1,94.5,124.8,131.2,142.6,150.1,160.5,155.8,129.8,112.0,78.9,65.2] },
+  "Струмица":   { lat:41.44, lng:22.64, pvout:[76.3,95.8,125.9,132.4,143.7,151.3,161.8,157.0,130.9,113.1,79.8,66.1] },
+  "Охрид":      { lat:41.12, lng:20.80, pvout:[74.2,93.6,123.5,130.0,141.5,149.0,159.4,154.6,128.7,111.0,78.1,64.4] },
+  "Штип":       { lat:41.74, lng:22.19, pvout:[74.8,94.1,124.1,130.7,142.0,149.6,160.0,155.3,129.3,111.6,78.6,64.9] },
+  "Тетово":     { lat:42.01, lng:20.97, pvout:[69.8,88.9,118.5,124.8,136.5,143.8,154.2,149.6,124.3,107.0,74.3,60.8] },
+  "Куманово":   { lat:42.13, lng:21.71, pvout:[70.5,89.6,119.2,125.5,137.1,144.4,154.9,150.2,124.9,107.6,74.9,61.4] },
+  "Велес":      { lat:41.71, lng:21.77, pvout:[72.8,92.4,122.2,128.4,139.9,147.3,157.8,153.2,127.6,110.1,77.0,63.3] },
+  "Прилеп":     { lat:41.34, lng:21.55, pvout:[74.5,93.8,123.8,130.3,141.8,149.3,159.7,155.0,129.1,111.3,78.3,64.6] }
+};
+const DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+const MONTH_SHORT = ["Јан","Фев","Мар","Апр","Мај","Јун","Јул","Авг","Сеп","Окт","Ное","Дек"];
+const MONTH_FULL  = ["Јануари","Февруари","Март","Април","Мај","Јуни","Јули","Август","Септември","Октомври","Ноември","Декември"];
+
+/* ===================== FORMAT HELPERS ===================== */
+function fmt(n, d=1){
+  if (!isFinite(n)) n = 0;
+  let s = n.toFixed(d);
+  let neg = s.startsWith('-');
+  if (neg) s = s.slice(1);
+  let [intPart, decPart] = s.split('.');
+  intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+  let out = decPart !== undefined ? intPart + ',' + decPart : intPart;
+  return (neg ? '-' : '') + out;
+}
+function formulaBlock(formula, substituted, result){
+  return `<details class="formula"><summary>📐 Формула</summary>
+    <div class="formula-body">
+      <div class="f-line"><span class="f-label">Формула</span><span class="f-mono">${formula}</span></div>
+      <div class="f-line"><span class="f-label">Замена</span><span class="f-mono">${substituted}</span></div>
+      <div class="f-line"><span class="f-label">Резултат</span><span class="f-mono f-result">${result}</span></div>
+    </div>
+  </details>`;
+}
+
+/* ===================== POPULATE CITY SELECT ===================== */
+const citySelect = document.getElementById('city');
+Object.keys(CITIES).forEach(name=>{
+  const opt = document.createElement('option');
+  opt.value = name; opt.textContent = name;
+  citySelect.appendChild(opt);
+});
+citySelect.value = "Скопје";
+
+/* ===================== INPUT REFS ===================== */
+const ids = ["tilt","azimuth","dod"];
+const inputs = {}; ids.forEach(id => inputs[id] = document.getElementById(id));
+const wpInput = document.getElementById('wp');
+const consumptionInput = document.getElementById('consumption');
+
+const UNITS = {
+  tilt:"°", azimuth:"°", dod:"%"
+};
+function syncLabel(id){
+  document.getElementById(id+"Val").textContent = inputs[id].value + UNITS[id];
+}
+ids.forEach(id=>{
+  syncLabel(id);
+  inputs[id].addEventListener('input', ()=>{ syncLabel(id); render(); });
+});
+citySelect.addEventListener('change', render);
+wpInput.addEventListener('input', render);
+consumptionInput.addEventListener('input', render);
+
+/* ===================== MAIN RENDER ===================== */
+function render(){
+  const cityName = citySelect.value;
+  const city = CITIES[cityName];
+  document.getElementById('cityCoords').textContent = `φ ${city.lat}°, λ ${city.lng}°`;
+
+  let wp = parseFloat(wpInput.value);
+  if (!isFinite(wp) || wp <= 0) wp = 590;
+  let dailyConsumption = parseFloat(consumptionInput.value);
+  if (!isFinite(dailyConsumption) || dailyConsumption < 0) dailyConsumption = 0;
+
+  const tilt = +inputs.tilt.value;
+  const azimuth = +inputs.azimuth.value;
+  const dod = +inputs.dod.value;
+
+  /* ---- standard assumption for hours without usable solar (battery must cover this) ---- */
+  const nightStart = 17;
+  const nightEnd = 8;
+
+  /* ---- correction factor (clamped to avoid divide-by-zero at extreme tilt/azimuth) ---- */
+  const tiltFactor = Math.max(0.05, Math.cos(Math.abs(tilt-34) * Math.PI/180));
+  const azFactor = Math.max(0.05, Math.cos(Math.abs(azimuth-180) * Math.PI/180 * 0.5));
+  const corrected = city.pvout.map(v => v * tiltFactor * azFactor);
+
+  /* ---- find worst month (lowest daily PVOUT per kWp) ---- */
+  const perKwpDaily = corrected.map((v,i) => v / DAYS[i]);
+  const worstIdx = perKwpDaily.indexOf(Math.min(...perKwpDaily));
+  const perKwpWorst = perKwpDaily[worstIdx];
+  const worstMonthName = MONTH_FULL[worstIdx];
+
+  /* ---- night / day split (cheap-tariff window) — independent of panel count ---- */
+  let nightHours;
+  if (nightEnd < nightStart) nightHours = 24 - nightStart + nightEnd;
+  else nightHours = nightEnd - nightStart;
+  const daytimeHours = 24 - nightHours;
+  const daytimeConsumption = daytimeHours * (dailyConsumption/24);
+  const nightConsumption = nightHours * (dailyConsumption/24); // = "batteryUsable" needed
+  const batteryGross = nightConsumption / (dod/100); // theoretical gross capacity needed — independent of panel count
+
+  /* ---- 1. recommend enough panels so the WORST month satisfies BOTH:
+           (a) daytime production covers daytime consumption, AND
+           (b) the leftover daytime surplus is enough to fully recharge the battery ---- */
+  const perPanelKwpWorst = perKwpWorst * (wp/1000);
+  const panelsForDaytime = Math.ceil(daytimeConsumption / perPanelKwpWorst);
+  const panelsForBattery = Math.ceil((daytimeConsumption + batteryGross) / perPanelKwpWorst);
+  const panels = Math.max(1, panelsForDaytime, panelsForBattery);
+  const kWp = panels * wp / 1000;
+
+  document.getElementById('panelsComputedNote').innerHTML =
+    `Препорачани панели: <strong>${panels}</strong> (${fmt(kWp,2)} kWp) — за да соларот ја покрива потрошувачката И го наполни батеријата во најлошиот месец (${worstMonthName})`;
+
+  /* ---- monthly arrays ---- */
+  const monthlyProd = corrected.map(v => kWp * v);
+  const dailyProd = monthlyProd.map((v,i) => v / DAYS[i]);
+  const monthlyCons = DAYS.map(d => dailyConsumption * d);
+  const surplus = monthlyProd.map((v,i) => v - monthlyCons[i]);
+
+  /* ---- annual (display only — does NOT drive the verdict) ---- */
+  const annualProd = monthlyProd.reduce((a,b)=>a+b, 0);
+  const annualCons = dailyConsumption * 365;
+  const selfSufficiency = annualCons > 0 ? Math.min(annualProd, annualCons) / annualCons * 100 : 100;
+
+  const solarDailyWorst = dailyProd[worstIdx];
+  const surplusForBattery = solarDailyWorst - daytimeConsumption;
+
+  /* ---- inverter ---- */
+  const inverterRaw = Math.max(dailyConsumption/6, kWp*1.1);
+  const inverterRounded = Math.ceil(inverterRaw/5)*5;
+
+  /* ===================== THREE-CHECK VERDICT (worst month, step by step) ===================== */
+  const EPS = 1e-9; // floating-point safety margin
+  const check1 = solarDailyWorst >= daytimeConsumption - EPS;     // соларот покрива дневна потрошувачка
+  const check2 = surplusForBattery >= batteryGross - EPS;         // доволен вишок да наполни батерија
+  const check3 = (batteryGross * (dod/100)) >= nightConsumption - EPS; // батеријата покрива ноќен период
+  const allPass = check1 && check2 && check3;
+
+  const safe = (fn, label) => { try { fn(); } catch(e){ console.error(`Грешка во секцијата "${label}":`, e); } };
+
+  safe(() => renderVerdict(allPass, worstMonthName), 'вердикт');
+  safe(() => renderVerdictChecks({check1, check2, check3, worstMonthName, solarDailyWorst, daytimeConsumption,
+                        surplusForBattery, batteryGross, nightConsumption, batteryUsableEffective: batteryGross * (dod/100), dod}), 'проверки');
+  safe(() => renderMetrics({kWp, panels, wp, perKwpWorst, worstMonthName, dailyConsumption, daytimeConsumption, annualProd, annualCons, selfSufficiency,
+                 batteryUsable: nightConsumption, batteryGross, inverterRounded, inverterRaw, dod}), 'метрики');
+  safe(() => renderChart(monthlyProd, monthlyCons, surplus), 'графикон');
+  safe(() => renderTable(monthlyProd, monthlyCons, dailyProd, surplus), 'месечна табела');
+  safe(() => renderBatterySteps({nightStart, nightEnd, nightHours, dailyConsumption, batteryUsable: nightConsumption, dod, batteryGross,
+                       daytimeHours, daytimeConsumption, solarDailyWorst, surplusForBattery, check2, worstMonthName}), 'батерија чекор-по-чекор');
+}
+
+/* ===================== VERDICT RENDER ===================== */
+function renderVerdict(allPass, worstMonthName){
+  const cfg = allPass
+    ? {cls:'green', icon:'✓', title:'СИСТЕМОТ ЌЕ РАБОТИ',
+       text:`Во најлошиот месец (${worstMonthName}) системот ги поминува сите три проверки подолу.`}
+    : {cls:'red', icon:'✗', title:'СИСТЕМОТ НЕМА ДА РАБОТИ',
+       text:`Во најлошиот месец (${worstMonthName}) системот не ги поминува сите три проверки подолу — види детали.`};
+
+  document.getElementById('verdictBox').innerHTML = `
+    <div class="verdict ${cfg.cls}">
+      <div class="icon">${cfg.icon}</div>
+      <div class="text">
+        <h3>${cfg.title}</h3>
+        <p>${cfg.text}</p>
+      </div>
+    </div>
+  `;
+}
+
+/* ===================== VERDICT CHECKS RENDER (3 explicit checks) ===================== */
+function renderVerdictChecks(d){
+  const rows = [
+    {
+      pass: d.check1,
+      title: `1. Дневно покривање во најлош месец (${d.worstMonthName})`,
+      detail: `производство ${fmt(d.solarDailyWorst,2)} kWh/ден ${d.check1?'≥':'<'} дневна потрошувачка ${fmt(d.daytimeConsumption,2)} kWh`,
+      msg: d.check1 ? 'Соларот ја покрива дневната потрошувачка во најлошиот месец.'
+                     : 'Соларот не ја покрива ни дневната потрошувачка во најлош месец.'
+    },
+    {
+      pass: d.check2,
+      title: '2. Дневен вишок за полнење на батеријата',
+      detail: `вишок ${fmt(d.surplusForBattery,2)} kWh ${d.check2?'≥':'<'} потребна батерија ${fmt(d.batteryGross,2)} kWh (gross)`,
+      msg: d.check2 ? 'Соларот произведува доволен дневен вишок за полнење на батеријата.'
+                     : 'Соларот не произведува доволно вишок за да ја наполни батеријата дневно.'
+    },
+    {
+      pass: d.check3,
+      title: '3. Батеријата ја покрива потрошувачката во ноќен период (без сонце)',
+      detail: `батерија (usable) ${fmt(d.batteryUsableEffective,2)} kWh ${d.check3?'≥':'<'} потрошувачка ${fmt(d.nightConsumption,2)} kWh (автоматска претпоставка: батерија = точно потребниот капацитет)`,
+      msg: d.check3 ? 'Батеријата е доволна за ноќниот период.'
+                     : 'Батеријата не ја покрива потрошувачката во ноќниот период.'
+    }
+  ];
+
+  document.getElementById('verdictChecks').innerHTML = rows.map(r => `
+    <div class="step ${r.pass ? 'yes' : 'no'}">
+      <div class="sidx">${r.pass ? '✓' : '✗'}</div>
+      <div class="scontent">
+        <div class="stitle">${r.title}</div>
+        <div class="sval" style="font-size:0.82rem;display:block;">${r.detail}</div>
+        <div style="margin-top:5px;font-size:0.82rem;font-weight:700;color:${r.pass ? 'var(--green)' : 'var(--red)'};">${r.msg}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ===================== METRICS RENDER ===================== */
+function renderMetrics(d){
+  const perPanelKwpWorst = d.perKwpWorst * (d.wp/1000);
+  const panelsForDaytime = Math.ceil(d.daytimeConsumption / perPanelKwpWorst);
+  const panelsForBattery = Math.ceil((d.daytimeConsumption + d.batteryGross) / perPanelKwpWorst);
+  const systemFormula = `<details class="formula"><summary>📐 Формула</summary>
+    <div class="formula-body">
+      <div class="f-line"><span class="f-label">Услов А</span><span class="f-mono">панели ≥ дневна_потр. ÷ (произв._по_kWp_најлош_месец × Wp/1000)  [да покрие потрошувачка]</span></div>
+      <div class="f-line"><span class="f-label">Замена</span><span class="f-mono">ceil(${fmt(d.daytimeConsumption,2)} ÷ ${fmt(perPanelKwpWorst,4)}) = ${panelsForDaytime} панели</span></div>
+      <div class="f-line" style="margin-top:6px;"><span class="f-label">Услов Б</span><span class="f-mono">панели ≥ (дневна_потр. + потребна_батерија) ÷ (произв._по_kWp_најлош_месец × Wp/1000)  [да наполни батерија]</span></div>
+      <div class="f-line"><span class="f-label">Замена</span><span class="f-mono">ceil((${fmt(d.daytimeConsumption,2)} + ${fmt(d.batteryGross,2)}) ÷ ${fmt(perPanelKwpWorst,4)}) = ${panelsForBattery} панели</span></div>
+      <div class="f-line" style="margin-top:6px;"><span class="f-label">Препорака</span><span class="f-mono f-result">панели = max(Услов А, Услов Б) = ${d.panels} панели → ${fmt(d.kWp,2)} kWp</span></div>
+      <div class="f-line" style="margin-top:6px;color:var(--ink-faint);"><span class="f-label">Најлош месец</span><span class="f-mono">${d.worstMonthName} (${fmt(d.perKwpWorst,3)} kWh/kWp/ден)</span></div>
+    </div>
+  </details>`;
+  const cards = [
+    {label:'Систем (препорака)', value:`${fmt(d.kWp,2)} kWp`, sub:`${d.panels} панели · базирано на ${d.worstMonthName}`,
+     formula: systemFormula},
+    {label:'Годишно производство', value:`${fmt(d.annualProd,0)} kWh`, sub:'сума на 12 месеци',
+     formula: formulaBlock('Σ месечно_производство', 'збир на сите 12 месечни вредности', `${fmt(d.annualProd,0)} kWh/год`)},
+    {label:'Годишна самодоволност', value:`${fmt(d.selfSufficiency,1)}%`, sub:'производство / потрошувачка (информативно)',
+     formula: formulaBlock('min(произв., потр.) ÷ потр. × 100', `min(${fmt(d.annualProd,0)}, ${fmt(d.annualCons,0)}) ÷ ${fmt(d.annualCons,0)} × 100`, `${fmt(d.selfSufficiency,1)}%`)},
+    {label:'Батерија потребна (usable)', value:`${fmt(d.batteryUsable,1)} kWh`, sub:'енергија за ноќен период',
+     formula: formulaBlock('ноќни_часови × (потр.дн ÷ 24)', `видете чекор-по-чекор подолу`, `${fmt(d.batteryUsable,1)} kWh`)},
+    {label:'Батерија потребна (gross)', value:`${fmt(d.batteryGross,1)} kWh`, sub:'со DoD корекција',
+     formula: formulaBlock('usable ÷ (DoD ÷ 100)', `${fmt(d.batteryUsable,1)} ÷ (${d.dod} ÷ 100)`, `${fmt(d.batteryGross,1)} kWh`)},
+    {label:'Препорачан инвертер', value:`${fmt(d.inverterRounded,0)} kW`, sub:`пресметано ${fmt(d.inverterRaw,2)} kW, заокружено нагоре`,
+     formula: formulaBlock('max(потр.дн ÷ 6, kWp × 1.1)', `max(${fmt(d.dailyConsumption,1)} ÷ 6, ${fmt(d.kWp,2)} × 1.1)`, `${fmt(d.inverterRaw,2)} kW → ${fmt(d.inverterRounded,0)} kW`)}
+  ];
+  document.getElementById('metricsBox').innerHTML = cards.map(c => `
+    <div class="metric">
+      <div class="mlabel">${c.label}</div>
+      <div class="mvalue">${c.value}</div>
+      <div class="msub">${c.sub}</div>
+      ${c.formula}
+    </div>
+  `).join('');
+}
+
+/* ===================== CHART RENDER (pure inline SVG — no external library) ===================== */
+function renderChart(monthlyProd, monthlyCons, surplus){
+  const target = document.getElementById('monthlyChart');
+  if (!target) return;
+
+  const W = 700, H = 320;
+  const marginL = 56, marginR = 14, marginT = 38, marginB = 34;
+  const plotW = W - marginL - marginR;
+  const plotH = H - marginT - marginB;
+
+  const maxVal = Math.max(1, ...monthlyProd, ...monthlyCons) * 1.15;
+  const slot = plotW / 12;
+  const barW = slot * 0.52;
+
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+    const y = marginT + plotH - f*plotH;
+    return `<line x1="${marginL}" y1="${y.toFixed(1)}" x2="${W-marginR}" y2="${y.toFixed(1)}" stroke="#E2E5E9" stroke-width="1"/>
+            <text x="${marginL-8}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#8A9097" font-family="ui-monospace,monospace">${fmt(f*maxVal,0)}</text>`;
+  }).join('');
+
+  const bars = monthlyProd.map((v,i) => {
+    const x = marginL + i*slot + (slot-barW)/2;
+    const h = Math.max(0, (v/maxVal)*plotH);
+    const y = marginT + plotH - h;
+    const color = surplus[i] >= 0 ? '#1D9E75' : '#E24B4A';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${color}"><title>${MONTH_FULL[i]} — производство: ${fmt(v,0)} kWh</title></rect>`;
+  }).join('');
+
+  const points = monthlyCons.map((v,i) => ({
+    x: marginL + i*slot + slot/2,
+    y: marginT + plotH - Math.max(0,(v/maxVal)*plotH),
+    v
+  }));
+  const linePath = points.map((p,i) => `${i===0?'M':'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const dots = points.map((p,i) =>
+    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4" fill="#378ADD" stroke="#fff" stroke-width="1.4"><title>${MONTH_FULL[i]} — потрошувачка: ${fmt(p.v,0)} kWh</title></circle>`
+  ).join('');
+
+  const xLabels = MONTH_SHORT.map((m,i) => {
+    const x = marginL + i*slot + slot/2;
+    return `<text x="${x.toFixed(1)}" y="${H-marginB+17}" text-anchor="middle" font-size="10.5" fill="#5B6168" font-family="system-ui,sans-serif">${m}</text>`;
+  }).join('');
+
+  target.innerHTML = `
+  <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:100%;display:block;" role="img" aria-label="Месечно производство наспроти потрошувачка">
+    <g>${gridLines}</g>
+    <line x1="${marginL}" y1="${(marginT+plotH).toFixed(1)}" x2="${W-marginR}" y2="${(marginT+plotH).toFixed(1)}" stroke="#C9CDD2" stroke-width="1.2"/>
+    <g>${bars}</g>
+    <path d="${linePath}" fill="none" stroke="#378ADD" stroke-width="2.2"/>
+    <g>${dots}</g>
+    <g>${xLabels}</g>
+    <g font-family="system-ui,sans-serif" font-size="11" font-weight="600">
+      <rect x="${marginL}" y="8" width="10" height="10" rx="2" fill="#1D9E75"></rect>
+      <text x="${marginL+15}" y="17" fill="#5B6168">Производство (kWh)</text>
+      <line x1="${marginL+172}" y1="13" x2="${marginL+188}" y2="13" stroke="#378ADD" stroke-width="2.5"></line>
+      <circle cx="${marginL+180}" cy="13" r="3" fill="#378ADD"></circle>
+      <text x="${marginL+196}" y="17" fill="#5B6168">Потрошувачка (kWh)</text>
+    </g>
+  </svg>`;
+}
+
+/* ===================== TABLE RENDER ===================== */
+function renderTable(monthlyProd, monthlyCons, dailyProd, surplus){
+  const rows = MONTH_FULL.map((name,i) => {
+    const ok = surplus[i] >= 0;
+    return `<tr>
+      <td>${name}</td>
+      <td class="num">${fmt(monthlyProd[i],0)}</td>
+      <td class="num">${fmt(monthlyCons[i],0)}</td>
+      <td class="num">${fmt(dailyProd[i],2)}</td>
+      <td class="num" style="color:${ok ? 'var(--green)' : 'var(--red)'};font-weight:700;">${surplus[i]>=0?'+':''}${fmt(surplus[i],0)}</td>
+      <td><span class="status-pill ${ok?'ok':'bad'}">${ok ? 'Вишок' : 'Дефицит'}</span></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('monthlyTableBody').innerHTML = rows;
+}
+
+/* ===================== BATTERY STEPS RENDER ===================== */
+function renderBatterySteps(d){
+  const html = `
+    <div class="step">
+      <div class="sidx">1</div>
+      <div class="scontent">
+        <div class="stitle">Ноќни часови (стандардна претпоставка 17:00–08:00)</div>
+        <div>Од ${d.nightStart}:00 до ${d.nightEnd}:00${d.nightEnd < d.nightStart ? ' (преку полноќ)' : ''} → <span class="sval">${d.nightHours} часа</span></div>
+        ${formulaBlock(d.nightEnd < d.nightStart ? '24 − почеток + крај' : 'крај − почеток',
+                        d.nightEnd < d.nightStart ? `24 − ${d.nightStart} + ${d.nightEnd}` : `${d.nightEnd} − ${d.nightStart}`,
+                        `${d.nightHours} ч`)}
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="sidx">2</div>
+      <div class="scontent">
+        <div class="stitle">Потрошувачка по час</div>
+        <div>При дневна потрошувачка ${fmt(d.dailyConsumption,1)} kWh → <span class="sval">${fmt(d.dailyConsumption/24,2)} kWh/час</span></div>
+        ${formulaBlock('потр.дн ÷ 24', `${fmt(d.dailyConsumption,1)} ÷ 24`, `${fmt(d.dailyConsumption/24,2)} kWh/ч`)}
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="sidx">3</div>
+      <div class="scontent">
+        <div class="stitle">Потребна енергија за ноќен период (usable)</div>
+        <div><span class="sval">${fmt(d.batteryUsable,1)} kWh</span></div>
+        ${formulaBlock('ноќни_часови × (потр.дн ÷ 24)', `${d.nightHours} × ${fmt(d.dailyConsumption/24,2)}`, `${fmt(d.batteryUsable,1)} kWh`)}
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="sidx">4</div>
+      <div class="scontent">
+        <div class="stitle">Со DoD ${(+inputs.dod.value)}% → потребен gross капацитет</div>
+        <div><span class="sval">${fmt(d.batteryGross,1)} kWh</span></div>
+        ${formulaBlock('usable ÷ (DoD ÷ 100)', `${fmt(d.batteryUsable,1)} ÷ (${(+inputs.dod.value)} ÷ 100)`, `${fmt(d.batteryGross,1)} kWh`)}
+      </div>
+    </div>
+
+    <div class="step ${d.check2 ? 'yes' : 'no'}">
+      <div class="sidx">${d.check2 ? '✓' : '✗'}</div>
+      <div class="scontent">
+        <div class="stitle">Дали соларот произведува доволен дневен вишок да ја наполни батеријата (во најслабиот месец — ${d.worstMonthName})?</div>
+        <div>Дневен вишок: <span class="sval">${fmt(d.solarDailyWorst,2)} − ${fmt(d.daytimeConsumption,2)} = ${fmt(d.surplusForBattery,2)} kWh</span> &nbsp;|&nbsp;
+             Потребна батерија (gross): <span class="sval">${fmt(d.batteryGross,2)} kWh</span></div>
+        <div style="margin-top:6px;font-weight:700;color:${d.check2 ? 'var(--green)' : 'var(--red)'};">
+          ${d.check2 ? 'ДА' : 'НЕ'} — вишок ${d.check2 ? '≥' : '<'} потребна батерија (gross)
+        </div>
+        ${formulaBlock('најслаб_дневно_произв. − дневна_потр. ? потребна батерија (gross)',
+                        `(${fmt(d.solarDailyWorst,2)} − ${fmt(d.daytimeConsumption,2)}) = ${fmt(d.surplusForBattery,2)}  ?  ${fmt(d.batteryGross,2)}`,
+                        `${fmt(d.surplusForBattery,2)} kWh ${d.check2?'≥':'<'} ${fmt(d.batteryGross,2)} kWh`)}
+      </div>
+    </div>
+  `;
+  document.getElementById('batterySteps').innerHTML = html;
+}
+
+/* ===================== INITIAL RENDER ===================== */
+render();
+</script>
+</body>
+</html>
